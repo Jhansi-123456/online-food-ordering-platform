@@ -16,13 +16,13 @@ pipeline {
                 echo 'Checking out source code from GitHub...'
 
                 git branch: 'main',
-                    url: 'https://github.com/Jhansi-123456/Online-Food-Ordering-Platform.git'
+                    url: 'https://github.com/Jhansi-123456/online-food-ordering-platform.git'
             }
         }
 
         stage('Create Environment Configuration') {
             steps {
-                echo 'Creating .env configuration for Jenkins...'
+                echo 'Creating Jenkins environment configuration...'
 
                 bat '''
                     (
@@ -51,7 +51,7 @@ pipeline {
 
         stage('Start Environment') {
             steps {
-                echo 'Starting the complete Docker Compose environment...'
+                echo 'Starting PostgreSQL, Order API and Nginx...'
 
                 bat 'docker compose up -d'
             }
@@ -59,11 +59,31 @@ pipeline {
 
         stage('Wait for Services') {
             steps {
-                echo 'Waiting for PostgreSQL and Order API to become available...'
+                echo 'Waiting for the application to become ready...'
 
                 bat '''
-                    timeout /t 10 /nobreak
-                    docker compose ps
+                    set RETRIES=12
+
+                    :check
+                    curl.exe --fail http://localhost:8082/health >nul 2>&1
+
+                    if %ERRORLEVEL% EQU 0 (
+                        echo Application is ready.
+                        goto done
+                    )
+
+                    set /a RETRIES=%RETRIES%-1
+
+                    if %RETRIES% LEQ 0 (
+                        echo Application did not become ready.
+                        exit /b 1
+                    )
+
+                    echo Waiting for application...
+                    timeout /t 5 /nobreak >nul
+                    goto check
+
+                    :done
                 '''
             }
         }
@@ -88,6 +108,7 @@ pipeline {
                       -d "{\\"customer_name\\":\\"%TEST_CUSTOMER%\\",\\"food_item\\":\\"%TEST_FOOD%\\",\\"quantity\\":%TEST_QUANTITY%}" ^
                       -o created-order.json
 
+                    echo Created order:
                     type created-order.json
                 '''
             }
@@ -99,6 +120,8 @@ pipeline {
 
                 bat '''
                     curl.exe --fail http://localhost:8082/orders -o orders.json
+
+                    echo Existing orders:
                     type orders.json
                 '''
             }
@@ -106,10 +129,21 @@ pipeline {
 
         stage('Verify Database') {
             steps {
-                echo 'Verifying that PostgreSQL contains the test order...'
+                echo 'Verifying that PostgreSQL contains the Jenkins test order...'
 
                 bat '''
-                    docker compose exec -T db psql -U fooduser -d food_orders -c "SELECT * FROM orders ORDER BY id;"
+                    docker compose exec -T db psql -U fooduser -d food_orders -tAc "SELECT COUNT(*) FROM orders WHERE customer_name='Jenkins Test' AND food_item='Burger' AND quantity=2;" > db-check.txt
+
+                    set /p COUNT=<db-check.txt
+
+                    echo Matching orders found: %COUNT%
+
+                    if "%COUNT%"=="0" (
+                        echo ERROR: Jenkins test order was not found in PostgreSQL.
+                        exit /b 1
+                    )
+
+                    echo Database verification successful.
                 '''
             }
         }
@@ -118,7 +152,7 @@ pipeline {
     post {
 
         failure {
-            echo 'Pipeline failed. Displaying useful Docker Compose logs...'
+            echo 'Pipeline failed. Displaying Docker Compose status and logs...'
 
             bat '''
                 docker compose ps
@@ -127,7 +161,7 @@ pipeline {
         }
 
         always {
-            echo 'Stopping application containers while preserving the PostgreSQL volume...'
+            echo 'Stopping application containers while preserving PostgreSQL volume...'
 
             bat '''
                 docker compose down
