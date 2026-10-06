@@ -43,9 +43,9 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo "Building Order API Docker image: %IMAGE_TAG%"
+                echo "Building Order API Docker image: ${IMAGE_TAG}"
 
-                bat 'docker compose build order-api'
+                bat 'docker-compose build order-api'
             }
         }
 
@@ -53,7 +53,7 @@ pipeline {
             steps {
                 echo 'Starting PostgreSQL, Order API and Nginx...'
 
-                bat 'docker compose up -d'
+                bat 'docker-compose up -d'
             }
         }
 
@@ -132,7 +132,7 @@ pipeline {
                 echo 'Verifying that PostgreSQL contains the Jenkins test order...'
 
                 bat '''
-                    docker compose exec -T db psql -U fooduser -d food_orders -tAc "SELECT COUNT(*) FROM orders WHERE customer_name='Jenkins Test' AND food_item='Burger' AND quantity=2;" > db-check.txt
+                    docker-compose exec -T db psql -U fooduser -d food_orders -tAc "SELECT COUNT(*) FROM orders WHERE customer_name='Jenkins Test' AND food_item='Burger' AND quantity=2;" > db-check.txt
 
                     set /p COUNT=<db-check.txt
 
@@ -155,8 +155,8 @@ pipeline {
             echo 'Pipeline failed. Displaying Docker Compose status and logs...'
 
             bat '''
-                docker compose ps
-                docker compose logs --tail=100
+                docker-compose ps
+                docker-compose logs --tail=100
             '''
         }
 
@@ -164,7 +164,7 @@ pipeline {
             echo 'Stopping application containers while preserving PostgreSQL volume...'
 
             bat '''
-                docker compose down
+                docker-compose down
             '''
         }
     }
