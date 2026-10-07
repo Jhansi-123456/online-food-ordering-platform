@@ -29,7 +29,7 @@ pipeline {
                         echo POSTGRES_DB=food_orders
                         echo POSTGRES_USER=fooduser
                         echo POSTGRES_PASSWORD=foodpassword
-                        echo DB_HOST=db
+                        echo DB_HOST=localhost
                         echo DB_PORT=5432
                         echo DB_NAME=food_orders
                         echo DB_USER=fooduser
